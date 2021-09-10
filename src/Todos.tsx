@@ -11,6 +11,17 @@ import {
   Checkbox,
 } from "@material-ui/core";
 import { ITodo, ITodos } from "./types";
+import { DragDropContext, Droppable, Draggable } from "react-beautiful-dnd";
+
+
+const reorder = (list: any, startIndex: any, endIndex: any) => {
+  const result = Array.from(list);
+  const [removed] = result.splice(startIndex, 1);
+  result.splice(endIndex, 0, removed);
+
+  return result;
+};
+
 
 const useStyles = makeStyles({
   addTodoContainer: { padding: 10 },
@@ -37,10 +48,49 @@ const useStyles = makeStyles({
   },
 });
 
+const grid = 8;
+const getItemStyle = (isDragging: any, draggableStyle: any) => ({
+  userSelect: "none",
+  margin: `0 0 ${grid}px 0`,
+  background: isDragging ? "grey" : "white",
+  ...draggableStyle
+});
+
+const getListStyle = (isDraggingOver: any) => ({
+  background: isDraggingOver ? "lightblue" : "white",
+});
+
 function Todos() {
   const classes = useStyles();
   const [todos, setTodos] = useState<ITodos>([]);
   const [newTodoText, setNewTodoText] = useState<string>("");
+  const [textValid, setTextValid] = useState<boolean>(true);
+
+
+  const onDragEnd = (result: any) => {
+    // dropped outside the list
+    if (!result.destination) {
+      return;
+    }
+    const newTodos: any = reorder(
+      todos,
+      result.source.index,
+      result.destination.index
+    );
+    setTodos(newTodos);
+
+    fetch(`http://localhost:3001/reorder`, {
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
+      method: "POST",
+      body: JSON.stringify({
+        sourceId: todos[result.source.index].id,
+        destinationId: todos[result.destination.index].id
+      }),
+    }).then(() => {});
+  }
 
   useEffect(() => {
     fetch("http://localhost:3001/")
@@ -49,17 +99,19 @@ function Todos() {
   }, [setTodos]);
 
   const addTodo = (text: string): void => {
-    fetch("http://localhost:3001/", {
-      headers: {
-        Accept: "application/json",
-        "Content-Type": "application/json",
-      },
-      method: "POST",
-      body: JSON.stringify({ text }),
-    })
-      .then((response) => response.json())
-      .then((todo) => setTodos([...todos, todo]));
-    setNewTodoText("");
+    if (textValid) {
+      fetch("http://localhost:3001/", {
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+        method: "POST",
+        body: JSON.stringify({ text }),
+      })
+        .then((response) => response.json())
+        .then((todo) => setTodos([...todos, todo]));
+      setNewTodoText("");
+    }
   }
 
   const toggleTodoCompleted = (id: string): void => {
@@ -89,6 +141,15 @@ function Todos() {
     }).then(() => setTodos(todos.filter((todo: ITodo) => todo.id !== id)));
   }
 
+  useEffect(() => {
+    if (newTodoText) {
+      setTextValid(true)
+    } else {
+      setTextValid(false)
+    }
+  }, [newTodoText]);
+
+
   return (
     <Container maxWidth="md">
       <Typography variant="h3" component="h1" gutterBottom>
@@ -99,6 +160,8 @@ function Todos() {
           <Box flexGrow={1}>
             <TextField
               fullWidth
+              error={!textValid}
+              helperText={!textValid ? "Text feild could not be empty" : ""}
               value={newTodoText}
               onKeyPress={(event: any) => {
                 if (event.key === "Enter") {
@@ -118,8 +181,75 @@ function Todos() {
         </Box>
       </Paper>
       {todos.length > 0 && (
+
         <Paper className={classes.todosContainer}>
           <Box display="flex" flexDirection="column" alignItems="stretch">
+            <DragDropContext onDragEnd={onDragEnd}>
+              <Droppable droppableId="droppable">
+                {(provided, snapshot) => (
+                  <div
+                    {...provided.droppableProps}
+                    ref={provided.innerRef}
+                    style={getListStyle(snapshot.isDraggingOver)}
+                  >
+                    {todos.map(({ id, text, completed }: ITodo, index: number) => (
+                      <Draggable key={id} draggableId={id} index={index}>
+                        {(provided, snapshot) => (
+                          <div
+                            ref={provided.innerRef}
+                            {...provided.draggableProps}
+                            {...provided.dragHandleProps}
+                            style={getItemStyle(
+                              snapshot.isDragging,
+                              provided.draggableProps.style
+                            )}
+                            className={classes.todoContainer}
+                          >
+                            <Box
+                              key={id}
+                              display="flex"
+                              flexDirection="row"
+                              alignItems="center"
+                            >
+                              <Checkbox
+                                checked={completed}
+                                onChange={() => toggleTodoCompleted(id)}
+                              ></Checkbox>
+                              <Box flexGrow={1}>
+                                <Typography
+                                  className={completed ? classes.todoTextCompleted : ""}
+                                  variant="body1"
+                                >
+                                  {text}
+                                </Typography>
+                              </Box>
+                              <Button
+                                className={classes.deleteTodo}
+                                startIcon={<Icon>delete</Icon>}
+                                onClick={() => deleteTodo(id)}
+                              >
+                                Delete
+                              </Button>
+                            </Box>
+                          </div>
+                        )}
+                      </Draggable>
+                    ))}
+                    {provided.placeholder}
+                  </div>
+                )}
+              </Droppable>
+            </DragDropContext>
+          </Box>
+        </Paper>
+      )}
+
+
+
+      {todos.length > 0 && (
+        <Paper className={classes.todosContainer}>
+          <Box display="flex" flexDirection="column" alignItems="stretch">
+
             {todos.map(({ id, text, completed }) => (
               <Box
                 key={id}
