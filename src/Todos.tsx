@@ -10,6 +10,7 @@ import {
   TextField,
   Checkbox,
 } from "@material-ui/core";
+import { ITodo, ITodos } from "./types";
 
 const useStyles = makeStyles({
   addTodoContainer: { padding: 10 },
@@ -38,8 +39,8 @@ const useStyles = makeStyles({
 
 function Todos() {
   const classes = useStyles();
-  const [todos, setTodos] = useState([]);
-  const [newTodoText, setNewTodoText] = useState("");
+  const [todos, setTodos] = useState<ITodos>([]);
+  const [newTodoText, setNewTodoText] = useState<string>("");
 
   useEffect(() => {
     fetch("http://localhost:3001/")
@@ -47,7 +48,7 @@ function Todos() {
       .then((todos) => setTodos(todos));
   }, [setTodos]);
 
-  function addTodo(text) {
+  const addTodo = (text: string): void => {
     fetch("http://localhost:3001/", {
       headers: {
         Accept: "application/json",
@@ -61,7 +62,7 @@ function Todos() {
     setNewTodoText("");
   }
 
-  function toggleTodoCompleted(id) {
+  const toggleTodoCompleted = (id: string): void => {
     fetch(`http://localhost:3001/${id}`, {
       headers: {
         Accept: "application/json",
@@ -69,7 +70,7 @@ function Todos() {
       },
       method: "PUT",
       body: JSON.stringify({
-        completed: !todos.find((todo) => todo.id === id).completed,
+        completed: !(todos.find((todo: ITodo) => todo.id === id) as ITodo).completed,
       }),
     }).then(() => {
       const newTodos = [...todos];
@@ -82,10 +83,10 @@ function Todos() {
     });
   }
 
-  function deleteTodo(id) {
+  const deleteTodo = (id: string): void => {
     fetch(`http://localhost:3001/${id}`, {
       method: "DELETE",
-    }).then(() => setTodos(todos.filter((todo) => todo.id !== id)));
+    }).then(() => setTodos(todos.filter((todo: ITodo) => todo.id !== id)));
   }
 
   return (
@@ -99,12 +100,12 @@ function Todos() {
             <TextField
               fullWidth
               value={newTodoText}
-              onKeyPress={(event) => {
+              onKeyPress={(event: any) => {
                 if (event.key === "Enter") {
                   addTodo(newTodoText);
                 }
               }}
-              onChange={(event) => setNewTodoText(event.target.value)}
+              onChange={(event: any) => setNewTodoText(event.target.value)}
             />
           </Box>
           <Button
