@@ -19,6 +19,8 @@ import {
 } from "@material-ui/pickers";
 import moment from "moment";
 import { IconButton } from "@material-ui/core";
+import InfiniteScroll from 'react-infinite-scroller'
+import CircularProgress from '@material-ui/core/CircularProgress';
 
 
 const reorder = (list: any, startIndex: any, endIndex: any) => {
@@ -73,6 +75,7 @@ const getListStyle = (isDraggingOver: any) => ({
 function Todos() {
   const classes = useStyles();
   const [todos, setTodos] = useState<ITodos>([]);
+  const [count, setCount] = useState<number>(0);
   const [newTodoText, setNewTodoText] = useState<string>("");
   const [textValid, setTextValid] = useState<boolean>(true);
 
@@ -102,11 +105,6 @@ function Todos() {
     }).then(() => { });
   }
 
-  useEffect(() => {
-    fetch("http://localhost:3001/")
-      .then((response) => response.json())
-      .then((todos) => setTodos(todos));
-  }, [setTodos]);
 
   const addTodo = (text: string): void => {
     if (text) {
@@ -179,6 +177,19 @@ function Todos() {
     }).then(() => setTodos(todos.filter((todo: ITodo) => todo.id !== id)));
   }
 
+  const loadData = (pageNumber: number = 1, nPerPage: number = 20) => {
+    fetch(`http://localhost:3001?pageNumber=${(pageNumber)}&nPerPage=${nPerPage}`)
+      .then((response) => response.json())
+      .then((res) => {
+        setCount(res.count)
+        setTodos([...todos, ...res.data]);
+      });
+  }
+
+  useEffect(() => {
+    loadData()
+  }, []);
+
   /*  const setDueDate = (id: string): void => {
   
     }
@@ -215,103 +226,111 @@ function Todos() {
         </Box>
       </Paper>
       {todos.length > 0 && (
-
-        <Paper className={classes.todosContainer}>
-          <Box display="flex" flexDirection="column" alignItems="stretch">
-            <DragDropContext onDragEnd={onDragEnd}>
-              <Droppable droppableId="droppable">
-                {(provided, snapshot) => (
-                  <div
-                    {...provided.droppableProps}
-                    ref={provided.innerRef}
-                    style={getListStyle(snapshot.isDraggingOver)}
-                  >
-                    {todos.map(({ id, text, completed, dueDate }: ITodo, index: number) => (
-                      <Draggable key={id} draggableId={id} index={index}>
-                        {(provided, snapshot) => (
-                          <div
-                            ref={provided.innerRef}
-                            {...provided.draggableProps}
-                            {...provided.dragHandleProps}
-                            style={getItemStyle(
-                              snapshot.isDragging,
-                              provided.draggableProps.style
-                            )}
-                            className={classes.todoContainer}
-                          >
-                            <Box
-                              key={id}
-                              display="flex"
-                              flexDirection="row"
-                              alignItems="center"
+        <InfiniteScroll
+          pageStart={1}
+          loadMore={(pageNumber) => loadData(pageNumber)}
+          hasMore={(count === 0) || (count !== 0 && count !== todos.length)}
+          loader={<div style={{textAlign: 'center'}}><CircularProgress /></div>}
+        >
+          <Paper className={classes.todosContainer}>
+            <Box display="flex" flexDirection="column" alignItems="stretch">
+              <DragDropContext onDragEnd={onDragEnd}>
+                <Droppable droppableId="droppable">
+                  {(provided, snapshot) => (
+                    <div
+                      {...provided.droppableProps}
+                      ref={provided.innerRef}
+                      style={getListStyle(snapshot.isDraggingOver)}
+                    >
+                      {todos.map(({ id, text, completed, dueDate }: ITodo, index: number) => (
+                        <Draggable key={id} draggableId={id} index={index}>
+                          {(provided, snapshot) => (
+                            <div
+                              ref={provided.innerRef}
+                              {...provided.draggableProps}
+                              {...provided.dragHandleProps}
+                              style={getItemStyle(
+                                snapshot.isDragging,
+                                provided.draggableProps.style
+                              )}
+                              className={classes.todoContainer}
                             >
-                              <Checkbox
-                                checked={completed}
-                                onChange={() => toggleTodoCompleted(id)}
-                              ></Checkbox>
-                              <Box flexGrow={1}>
-                                <Typography
-                                  className={completed ? classes.todoTextCompleted : ""}
-                                  variant="body1"
-                                >
-                                  {text}
-                                </Typography>
-                                {dueDate &&
-                                  <Typography
-                                    variant="body2"
-                                    className={moment(dueDate).isBefore(moment()) ? classes.overDue : ""}
-                                  >
-                                    Due Date is: {moment(dueDate).format("YYYY-MM-DD HH:mm")} {moment(dueDate).isBefore(moment()) && <span>[Overdue!!]</span>}
-                                  </Typography>
-                                }
-                              </Box>
-                              <MuiPickersUtilsProvider utils={MomentUtils} locale="en">
-                                <DateTimePicker
-                                  className={classes.deleteTodo}
-                                  disabled={completed}
-                                  showTodayButton={true}
-                                  disablePast={true}
-                                  disableFuture={false}
-                                  todayLabel="Today"
-                                  clearable={true}
-                                  variant="dialog"
-                                  okLabel="Ok"
-                                  cancelLabel="Cancel"
-                                  clearLabel="Clear"
-                                  labelFunc={(date: any) => date.format("YYYY-MM-DD HH:mm")}
-                                  value={(dueDate !== undefined && dueDate !== null) ? dueDate : moment()}
-                                  onChange={(date: any) => handleDueDateChanged(id, date)}
-                                  InputProps={{
-                                    endAdornment: (
-                                      <IconButton
-                                        aria-label="Select locale"
-                                        disabled={completed}
-                                      >
-                                        <Icon>schedule</Icon>
-                                      </IconButton>
-                                    ),
-                                  }}
-                                />
-                              </MuiPickersUtilsProvider>
-                              <Button
-                                className={classes.deleteTodo}
-                                startIcon={<Icon>delete</Icon>}
-                                onClick={() => deleteTodo(id)}
+                              <Box
+                                key={id}
+                                display="flex"
+                                flexDirection="row"
+                                alignItems="center"
                               >
-                                Delete
-                              </Button>
-                            </Box>
-                          </div>
-                        )}
-                      </Draggable>
-                    ))}
-                    {provided.placeholder}
-                  </div>
-                )}
-              </Droppable>
-            </DragDropContext>
-          </Box>
-        </Paper>
+                                <Checkbox
+                                  checked={completed}
+                                  onChange={() => toggleTodoCompleted(id)}
+                                ></Checkbox>
+                                <Box flexGrow={1}>
+                                  <Typography
+                                    className={completed ? classes.todoTextCompleted : ""}
+                                    variant="body1"
+                                  >
+                                    {text}
+                                  </Typography>
+                                  {dueDate &&
+                                    <Typography
+                                      variant="body2"
+                                      className={moment(dueDate).isBefore(moment()) ? classes.overDue : ""}
+                                    >
+                                      Due Date is: {moment(dueDate).format("YYYY-MM-DD HH:mm")} {moment(dueDate).isBefore(moment()) && <span>[Overdue!!]</span>}
+                                    </Typography>
+                                  }
+                                </Box>
+                                <MuiPickersUtilsProvider utils={MomentUtils} locale="en">
+                                  <DateTimePicker
+                                    className={classes.deleteTodo}
+                                    disabled={completed}
+                                    showTodayButton={true}
+                                    disablePast={true}
+                                    disableFuture={false}
+                                    todayLabel="Today"
+                                    clearable={true}
+                                    variant="dialog"
+                                    okLabel="Ok"
+                                    cancelLabel="Cancel"
+                                    clearLabel="Clear"
+                                    labelFunc={(date: any) => date.format("YYYY-MM-DD HH:mm")}
+                                    value={(dueDate !== undefined && dueDate !== null) ? dueDate : moment()}
+                                    onChange={(date: any) => handleDueDateChanged(id, date)}
+                                    InputProps={{
+                                      endAdornment: (
+                                        <IconButton
+                                          aria-label="Select locale"
+                                          disabled={completed}
+                                        >
+                                          <Icon>schedule</Icon>
+                                        </IconButton>
+                                      ),
+                                    }}
+                                  />
+                                </MuiPickersUtilsProvider>
+                                <Button
+                                  className={classes.deleteTodo}
+                                  startIcon={<Icon>delete</Icon>}
+                                  onClick={() => deleteTodo(id)}
+                                >
+                                  Delete
+                                </Button>
+                              </Box>
+                            </div>
+                          )}
+                        </Draggable>
+                      ))}
+                      {provided.placeholder}
+                    </div>
+                  )}
+                </Droppable>
+              </DragDropContext>
+            </Box>
+          </Paper>
+        </InfiniteScroll>
+
+
       )}
     </Container>
   );
