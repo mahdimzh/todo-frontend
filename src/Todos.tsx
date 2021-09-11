@@ -12,6 +12,13 @@ import {
 } from "@material-ui/core";
 import { ITodo, ITodos } from "./types";
 import { DragDropContext, Droppable, Draggable } from "react-beautiful-dnd";
+import MomentUtils from "@date-io/moment";
+import {
+  DateTimePicker,
+  MuiPickersUtilsProvider,
+} from "@material-ui/pickers";
+import moment from "moment";
+import { IconButton } from "@material-ui/core";
 
 
 const reorder = (list: any, startIndex: any, endIndex: any) => {
@@ -42,6 +49,9 @@ const useStyles = makeStyles({
   },
   todoTextCompleted: {
     textDecoration: "line-through",
+  },
+  overDue: {
+    color: "red",
   },
   deleteTodo: {
     visibility: "hidden",
@@ -89,7 +99,7 @@ function Todos() {
         sourceId: todos[result.source.index].id,
         destinationId: todos[result.destination.index].id
       }),
-    }).then(() => {});
+    }).then(() => { });
   }
 
   useEffect(() => {
@@ -99,7 +109,8 @@ function Todos() {
   }, [setTodos]);
 
   const addTodo = (text: string): void => {
-    if (textValid) {
+    if (text) {
+      setTextValid(true)
       fetch("http://localhost:3001/", {
         headers: {
           Accept: "application/json",
@@ -111,6 +122,9 @@ function Todos() {
         .then((response) => response.json())
         .then((todo) => setTodos([...todos, todo]));
       setNewTodoText("");
+    } else {
+      setTextValid(false)
+      alert("Text should not be empty")
     }
   }
 
@@ -123,6 +137,7 @@ function Todos() {
       method: "PUT",
       body: JSON.stringify({
         completed: !(todos.find((todo: ITodo) => todo.id === id) as ITodo).completed,
+        action: 'COMPLETE_TASK'
       }),
     }).then(() => {
       const newTodos = [...todos];
@@ -135,20 +150,39 @@ function Todos() {
     });
   }
 
+  const handleDueDateChanged = (id: string, date: Date): void => {
+    fetch(`http://localhost:3001/${id}`, {
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
+      method: "PUT",
+      body: JSON.stringify({
+        dueDate: date,
+        action: 'SET_DUE_TO_DATE'
+      }),
+    }).then(() => {
+      const newTodos = [...todos];
+      const modifiedTodoIndex = newTodos.findIndex((todo) => todo.id === id);
+      newTodos[modifiedTodoIndex] = {
+        ...newTodos[modifiedTodoIndex],
+        dueDate: date as Date,
+      };
+      setTodos(newTodos);
+
+    });
+  }
+
   const deleteTodo = (id: string): void => {
     fetch(`http://localhost:3001/${id}`, {
       method: "DELETE",
     }).then(() => setTodos(todos.filter((todo: ITodo) => todo.id !== id)));
   }
 
-  useEffect(() => {
-    if (newTodoText) {
-      setTextValid(true)
-    } else {
-      setTextValid(false)
+  /*  const setDueDate = (id: string): void => {
+  
     }
-  }, [newTodoText]);
-
+  */
 
   return (
     <Container maxWidth="md">
@@ -192,7 +226,7 @@ function Todos() {
                     ref={provided.innerRef}
                     style={getListStyle(snapshot.isDraggingOver)}
                   >
-                    {todos.map(({ id, text, completed }: ITodo, index: number) => (
+                    {todos.map(({ id, text, completed, dueDate }: ITodo, index: number) => (
                       <Draggable key={id} draggableId={id} index={index}>
                         {(provided, snapshot) => (
                           <div
@@ -222,7 +256,43 @@ function Todos() {
                                 >
                                   {text}
                                 </Typography>
+                                {dueDate &&
+                                  <Typography
+                                    variant="body2"
+                                    className={moment(dueDate).isBefore(moment()) ? classes.overDue : ""}
+                                  >
+                                    Due Date is: {moment(dueDate).format("YYYY-MM-DD HH:mm")} {moment(dueDate).isBefore(moment()) && <span>[Overdue!!]</span>}
+                                  </Typography>
+                                }
                               </Box>
+                              <MuiPickersUtilsProvider utils={MomentUtils} locale="en">
+                                <DateTimePicker
+                                  className={classes.deleteTodo}
+                                  disabled={completed}
+                                  showTodayButton={true}
+                                  disablePast={true}
+                                  disableFuture={false}
+                                  todayLabel="Today"
+                                  clearable={true}
+                                  variant="dialog"
+                                  okLabel="Ok"
+                                  cancelLabel="Cancel"
+                                  clearLabel="Clear"
+                                  labelFunc={(date: any) => date.format("YYYY-MM-DD HH:mm")}
+                                  value={(dueDate !== undefined && dueDate !== null) ? dueDate : moment()}
+                                  onChange={(date: any) => handleDueDateChanged(id, date)}
+                                  InputProps={{
+                                    endAdornment: (
+                                      <IconButton
+                                        aria-label="Select locale"
+                                        disabled={completed}
+                                      >
+                                        <Icon>schedule</Icon>
+                                      </IconButton>
+                                    ),
+                                  }}
+                                />
+                              </MuiPickersUtilsProvider>
                               <Button
                                 className={classes.deleteTodo}
                                 startIcon={<Icon>delete</Icon>}
@@ -240,45 +310,6 @@ function Todos() {
                 )}
               </Droppable>
             </DragDropContext>
-          </Box>
-        </Paper>
-      )}
-
-
-
-      {todos.length > 0 && (
-        <Paper className={classes.todosContainer}>
-          <Box display="flex" flexDirection="column" alignItems="stretch">
-
-            {todos.map(({ id, text, completed }) => (
-              <Box
-                key={id}
-                display="flex"
-                flexDirection="row"
-                alignItems="center"
-                className={classes.todoContainer}
-              >
-                <Checkbox
-                  checked={completed}
-                  onChange={() => toggleTodoCompleted(id)}
-                ></Checkbox>
-                <Box flexGrow={1}>
-                  <Typography
-                    className={completed ? classes.todoTextCompleted : ""}
-                    variant="body1"
-                  >
-                    {text}
-                  </Typography>
-                </Box>
-                <Button
-                  className={classes.deleteTodo}
-                  startIcon={<Icon>delete</Icon>}
-                  onClick={() => deleteTodo(id)}
-                >
-                  Delete
-                </Button>
-              </Box>
-            ))}
           </Box>
         </Paper>
       )}
