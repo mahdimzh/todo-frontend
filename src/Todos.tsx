@@ -21,6 +21,9 @@ import moment from "moment";
 import { IconButton } from "@material-ui/core";
 import InfiniteScroll from 'react-infinite-scroller'
 import CircularProgress from '@material-ui/core/CircularProgress';
+import FilterMenut from "./filter-menu";
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 
 const reorder = (list: any, startIndex: any, endIndex: any) => {
@@ -75,12 +78,40 @@ const getListStyle = (isDraggingOver: any) => ({
 function Todos() {
   const classes = useStyles();
   const [todos, setTodos] = useState<ITodos>([]);
-  const [count, setCount] = useState<number>(0);
+  const [hasMore, setHasMore] = useState<boolean>(true);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [dragDisabled, setDragDisabled] = useState<boolean>(false);
   const [newTodoText, setNewTodoText] = useState<string>("");
   const [textValid, setTextValid] = useState<boolean>(true);
+  const [selectedFilterIndex, setSelectedFilterIndex] = useState<number>(0);
+
+  const [filters, setFilters] = useState<any>({
+    sort: -1,
+    query: [],
+  });
+
+  const resetFilters = () => {
+    setFilters((filters: any) => ({
+      ...filters,
+      sort: -1,
+      query: []
+    }))
+  }
+
+  const showNotification = (message: string, variant: any = 'info') => {
+    toast(message, variant);
+  };
+
+  const filterOptions = [
+    'Priority',
+    //    'Oldest First',
+    'Due Today',
+  ];
 
 
   const onDragEnd = (result: any) => {
+    setLoading(true)
+    setDragDisabled(true)
     // dropped outside the list
     if (!result.destination) {
       return;
@@ -102,12 +133,34 @@ function Todos() {
         sourceId: todos[result.source.index].id,
         destinationId: todos[result.destination.index].id
       }),
-    }).then(() => { });
+    })
+      .then((response) => response.json())
+      .then((res: any) => {
+        setDragDisabled(false)
+        setLoading(false)
+        if (res.errors !== undefined) {
+          if (Array.isArray(res.errors)) {
+            res.errors.forEach((error: any) => {
+              showNotification(error.msg, 'error')
+            })
+          }
+
+          return;
+        }
+
+      })
+      .catch((error: any) => {
+        setLoading(false)
+        setDragDisabled(false)
+        showNotification(error, 'error')
+      });
+    ;
   }
 
 
   const addTodo = (text: string): void => {
     if (text) {
+      setLoading(true)
       setTextValid(true)
       fetch("http://localhost:3001/", {
         headers: {
@@ -118,7 +171,27 @@ function Todos() {
         body: JSON.stringify({ text }),
       })
         .then((response) => response.json())
-        .then((todo) => setTodos([...todos, todo]));
+        .then((res) => {
+          setLoading(false)
+
+          if (res.errors !== undefined) {
+            if (Array.isArray(res.errors)) {
+              res.errors.forEach((error: any) => {
+                showNotification(error.msg, 'error')
+              })
+            }
+            return;
+          }
+
+          const newTodos = [res].concat(todos)
+
+          setTodos(newTodos)
+        })
+        .catch((error: any) => {
+          setLoading(false)
+          showNotification(error, 'error')
+        });
+
       setNewTodoText("");
     } else {
       setTextValid(false)
@@ -127,6 +200,7 @@ function Todos() {
   }
 
   const toggleTodoCompleted = (id: string): void => {
+    setLoading(true)
     fetch(`http://localhost:3001/${id}`, {
       headers: {
         Accept: "application/json",
@@ -137,18 +211,36 @@ function Todos() {
         completed: !(todos.find((todo: ITodo) => todo.id === id) as ITodo).completed,
         action: 'COMPLETE_TASK'
       }),
-    }).then(() => {
-      const newTodos = [...todos];
-      const modifiedTodoIndex = newTodos.findIndex((todo) => todo.id === id);
-      newTodos[modifiedTodoIndex] = {
-        ...newTodos[modifiedTodoIndex],
-        completed: !newTodos[modifiedTodoIndex].completed,
-      };
-      setTodos(newTodos);
-    });
+    })
+      .then((res: any) => {
+        setLoading(false)
+        if (res.errors !== undefined) {
+          if (Array.isArray(res.errors)) {
+            res.errors.forEach((error: any) => {
+              showNotification(error.msg, 'error')
+            })
+          }
+          return;
+        }
+
+        const newTodos = [...todos];
+        const modifiedTodoIndex = newTodos.findIndex((todo) => todo.id === id);
+        newTodos[modifiedTodoIndex] = {
+          ...newTodos[modifiedTodoIndex],
+          completed: !newTodos[modifiedTodoIndex].completed,
+        };
+
+        setTodos(newTodos);
+      })
+      .catch((error: any) => {
+        setLoading(false)
+        showNotification(error, 'error')
+      });
+    ;
   }
 
   const handleDueDateChanged = (id: string, date: Date): void => {
+    setLoading(true)
     fetch(`http://localhost:3001/${id}`, {
       headers: {
         Accept: "application/json",
@@ -159,36 +251,100 @@ function Todos() {
         dueDate: date,
         action: 'SET_DUE_TO_DATE'
       }),
-    }).then(() => {
-      const newTodos = [...todos];
-      const modifiedTodoIndex = newTodos.findIndex((todo) => todo.id === id);
-      newTodos[modifiedTodoIndex] = {
-        ...newTodos[modifiedTodoIndex],
-        dueDate: date as Date,
-      };
-      setTodos(newTodos);
+    })
+      .then((res: any) => {
+        setLoading(false)
+        if (res.errors !== undefined) {
+          if (Array.isArray(res.errors)) {
+            res.errors.forEach((error: any) => {
+              showNotification(error.msg, 'error')
+            })
+          }
+          return;
+        }
 
-    });
+        const newTodos = [...todos];
+        const modifiedTodoIndex = newTodos.findIndex((todo) => todo.id === id);
+        newTodos[modifiedTodoIndex] = {
+          ...newTodos[modifiedTodoIndex],
+          dueDate: date as Date,
+        };
+        setTodos(newTodos);
+
+      })
+      .catch((error: any) => {
+        setLoading(false)
+        showNotification(error, 'error')
+      });
+    ;
   }
 
   const deleteTodo = (id: string): void => {
+    setLoading(true)
     fetch(`http://localhost:3001/${id}`, {
       method: "DELETE",
-    }).then(() => setTodos(todos.filter((todo: ITodo) => todo.id !== id)));
+    })
+      .then((_res: any) => {
+        setLoading(false)
+        setTodos(todos.filter((todo: ITodo) => todo.id !== id))
+      })
+      .catch((error: any) => {
+        setLoading(false)
+        showNotification(error, 'error')
+      });
   }
 
   const loadData = (pageNumber: number = 1, nPerPage: number = 20) => {
-    fetch(`http://localhost:3001?pageNumber=${(pageNumber)}&nPerPage=${nPerPage}`)
+    setLoading(true)
+    fetch(`http://localhost:3001?pageNumber=${(pageNumber)}&nPerPage=${nPerPage}&sortOrder=${filters.sort}&query=${filters.query.join(',')}`)
       .then((response) => response.json())
       .then((res) => {
-        setCount(res.count)
+        setLoading(false)
+        if (res.errors !== undefined) {
+          if (Array.isArray(res.errors)) {
+            res.errors.forEach((error: any) => {
+              showNotification(error.msg, 'error')
+            })
+          }
+          return;
+        }
         setTodos([...todos, ...res.data]);
+
+        if (res.data.length === 0 || (todos.length > 0 && todos.length === res.count)) {
+          setHasMore(false)
+        } else {
+          setHasMore(true)
+        }
+      })
+      .catch((error: any) => {
+        setLoading(false)
+        showNotification(error, 'error')
       });
+  }
+
+  const handleFilterChanged = (index: number) => {
+    setSelectedFilterIndex(index)
+    setTodos([])
+    setHasMore(true)
+
+    if (index === 1) {
+      setFilters((filters: any) => ({
+        ...filters,
+        query: ['dueToday']
+      }))
+
+    } else {
+      resetFilters()
+    }
   }
 
   useEffect(() => {
     loadData()
   }, []);
+
+  useEffect(() => {
+    loadData()
+  }, [filters]);
 
   /*  const setDueDate = (id: string): void => {
   
@@ -197,8 +353,9 @@ function Todos() {
 
   return (
     <Container maxWidth="md">
+      <ToastContainer />
       <Typography variant="h3" component="h1" gutterBottom>
-        Todos
+        Todos {loading && <CircularProgress />}
       </Typography>
       <Paper className={classes.addTodoContainer}>
         <Box display="flex" flexDirection="row">
@@ -223,14 +380,19 @@ function Todos() {
           >
             Add
           </Button>
+          <FilterMenut
+            value={selectedFilterIndex}
+            onChange={handleFilterChanged}
+            options={filterOptions}
+          />
         </Box>
       </Paper>
       {todos.length > 0 && (
         <InfiniteScroll
           pageStart={1}
           loadMore={(pageNumber) => loadData(pageNumber)}
-          hasMore={(count === 0) || (count !== 0 && count !== todos.length)}
-          loader={<div style={{textAlign: 'center'}}><CircularProgress /></div>}
+          hasMore={hasMore}
+          loader={<div style={{ textAlign: 'center' }}><CircularProgress /></div>}
         >
           <Paper className={classes.todosContainer}>
             <Box display="flex" flexDirection="column" alignItems="stretch">
@@ -243,7 +405,7 @@ function Todos() {
                       style={getListStyle(snapshot.isDraggingOver)}
                     >
                       {todos.map(({ id, text, completed, dueDate }: ITodo, index: number) => (
-                        <Draggable key={id} draggableId={id} index={index}>
+                        <Draggable key={id} draggableId={id} index={index} isDragDisabled={dragDisabled}>
                           {(provided, snapshot) => (
                             <div
                               ref={provided.innerRef}
