@@ -86,7 +86,7 @@ function Todos() {
   //const [total, setTotal] = useState<number>(0);
   const [selectedFilterIndex, setSelectedFilterIndex] = useState<number>(0);
   const [pageNumber, setPageNumber] = useState<number>(1);
-  const nPerPage = 20;
+  const nPerPage = 5;
 
   const [filters, setFilters] = useState<any>({
     sort: -1,
@@ -342,12 +342,9 @@ function Todos() {
   }
 
   useEffect(() => {
-    setPageNumber(1)
-  }, [filters]);
-
-  useEffect(() => {
     loadData()
-  }, [pageNumber]);
+  }, [filters, pageNumber]);
+
 
   /*  const setDueDate = (id: string): void => {
   
@@ -385,7 +382,7 @@ function Todos() {
             Add
           </Button>
           <FilterMenut
-            value={selectedFilterIndex} 
+            value={selectedFilterIndex}
             onChange={handleFilterChanged}
             options={filterOptions}
           />
