@@ -107,7 +107,6 @@ function Todos() {
 
   const filterOptions = [
     'Priority',
-    //    'Oldest First',
     'Due Today',
   ];
 
