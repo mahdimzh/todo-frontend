@@ -19,11 +19,11 @@ import {
 } from "@material-ui/pickers";
 import moment from "moment";
 import { IconButton } from "@material-ui/core";
-import InfiniteScroll from 'react-infinite-scroller'
 import CircularProgress from '@material-ui/core/CircularProgress';
 import FilterMenut from "./filter-menu";
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import InfiniteScroll from 'react-infinite-scroll-component';
 
 
 const reorder = (list: any, startIndex: any, endIndex: any) => {
@@ -83,7 +83,10 @@ function Todos() {
   const [dragDisabled, setDragDisabled] = useState<boolean>(false);
   const [newTodoText, setNewTodoText] = useState<string>("");
   const [textValid, setTextValid] = useState<boolean>(true);
+  //const [total, setTotal] = useState<number>(0);
   const [selectedFilterIndex, setSelectedFilterIndex] = useState<number>(0);
+  const [pageNumber, setPageNumber] = useState<number>(1);
+  const nPerPage = 20;
 
   const [filters, setFilters] = useState<any>({
     sort: -1,
@@ -294,7 +297,7 @@ function Todos() {
       });
   }
 
-  const loadData = (pageNumber: number = 1, nPerPage: number = 20) => {
+  const loadData = () => {
     setLoading(true)
     fetch(`http://localhost:3001?pageNumber=${(pageNumber)}&nPerPage=${nPerPage}&sortOrder=${filters.sort}&query=${filters.query.join(',')}`)
       .then((response) => response.json())
@@ -309,6 +312,7 @@ function Todos() {
           return;
         }
         setTodos([...todos, ...res.data]);
+        //setTotal(res.count);
 
         if (res.data.length === 0 || (todos.length > 0 && todos.length === res.count)) {
           setHasMore(false)
@@ -339,12 +343,12 @@ function Todos() {
   }
 
   useEffect(() => {
-    loadData()
-  }, []);
+    setPageNumber(1)
+  }, [filters]);
 
   useEffect(() => {
     loadData()
-  }, [filters]);
+  }, [pageNumber]);
 
   /*  const setDueDate = (id: string): void => {
   
@@ -377,11 +381,12 @@ function Todos() {
             className={classes.addTodoButton}
             startIcon={<Icon>add</Icon>}
             onClick={() => addTodo(newTodoText)}
+            data-testid="to-do-btn"
           >
             Add
           </Button>
           <FilterMenut
-            value={selectedFilterIndex}
+            value={selectedFilterIndex} 
             onChange={handleFilterChanged}
             options={filterOptions}
           />
@@ -389,10 +394,25 @@ function Todos() {
       </Paper>
       {todos.length > 0 && (
         <InfiniteScroll
-          pageStart={1}
-          loadMore={(pageNumber) => loadData(pageNumber)}
+          dataLength={todos.length}
           hasMore={hasMore}
-          loader={<div style={{ textAlign: 'center' }}><CircularProgress /></div>}
+          loader={loading && <div style={{ textAlign: 'center' }}><CircularProgress /></div>}
+          endMessage={
+            <p style={{ textAlign: 'center' }}>
+              <b>Yay! You have seen it all</b>
+            </p>
+          }
+          // below props only if you need pull down functionality
+          next={() => setPageNumber(pageNumber + 1)}
+          //refreshFunction={() => setPageNumber(1)}
+          pullDownToRefresh={false}
+          pullDownToRefreshThreshold={50}
+          pullDownToRefreshContent={
+            <h3 style={{ textAlign: 'center' }}>&#8595; Pull down to refresh</h3>
+          }
+          releaseToRefreshContent={
+            <h3 style={{ textAlign: 'center' }}>&#8593; Release to refresh</h3>
+          }
         >
           <Paper className={classes.todosContainer}>
             <Box display="flex" flexDirection="column" alignItems="stretch">
